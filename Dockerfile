@@ -9,7 +9,7 @@
 ################################################################################
 
 # Create a stage for resolving and downloading dependencies.
-FROM eclipse-temurin:17-jdk-jammy as deps
+FROM eclipse-temurin:21-jdk-jammy as deps
 
 WORKDIR /build
 
@@ -56,6 +56,20 @@ RUN java -Djarmode=layertools -jar target/app.jar extract --destination target/e
 
 ################################################################################
 
+# Create a new stage for developing the application.
+# This stage is used for development and testing, and it contains the
+# necessary dependencies and tools to run the application in a local environment.
+# It is based on the same base image as the "extract" stage, but it includes
+FROM extract as development
+WORKDIR /build
+COPY --from=extract  build/target/extracted/dependencies/  ./
+COPY --from=extract build/target/extracted/spring-boot-loader/ ./
+COPY --from=extract build/target/extracted/snapshot-dependencies/  ./
+COPY --from=extract build/target/extracted/application/  ./
+ENV JAVA_TOOL_OPTIONS -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:8000
+# CMD [ "java", "-Dspring.profile.active=postgres", "org.springframework.boot.loader.launch.JarLauncher." ]
+CMD [ "java", "-Dspring.profiles.active=postgres", "org.springframework.boot.loader.launch.JarLauncher" ]
+
 # Create a new stage for running the application that contains the minimal
 # runtime dependencies for the application. This often uses a different base
 # image from the install or build stage where the necessary files are copied
@@ -66,7 +80,7 @@ RUN java -Djarmode=layertools -jar target/app.jar extract --destination target/e
 # most recent version of that tag when you build your Dockerfile.
 # If reproducibility is important, consider using a specific digest SHA, like
 # eclipse-temurin@sha256:99cede493dfd88720b610eb8077c8688d3cca50003d76d1d539b0efc8cca72b4.
-FROM eclipse-temurin:17-jre-jammy AS final
+FROM eclipse-temurin:21-jre-jammy AS final
 
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/
