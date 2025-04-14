@@ -9,7 +9,7 @@
 ################################################################################
 
 # Create a stage for resolving and downloading dependencies.
-FROM eclipse-temurin:21-jdk-jammy as deps
+FROM eclipse-temurin:21-jdk-jammy as base
 
 WORKDIR /build
 
@@ -24,6 +24,30 @@ RUN --mount=type=bind,source=pom.xml,target=pom.xml \
     --mount=type=cache,target=/root/.m2 ./mvnw dependency:go-offline -DskipTests
 
 ################################################################################
+# Create a stage for testing the application.
+# This stage is used for running tests and other build tasks.
+# It is based on the same base image as the "base" stage, but it includes
+# additional dependencies and tools for testing.
+FROM base as test
+WORKDIR /build
+COPY ./src src/
+RUN --mount=type=bind,source=pom.xml,target=pom.xml \
+    --mount=type=cache,target=/root/.m2 \
+    ./mvnw test
+
+
+
+
+################################################################################
+# Create a stage for dependencies the application.
+# This stage is used for building the application and its dependencies.
+# It is based on the same base image as the "base" stage, but it includes
+# additional dependencies and tools for building the application.
+FROM base as deps
+WORKDIR /build
+RUN --mount=type=bind,source=pom.xml,target=pom.xml \
+    --mount=type=cache,target=/root/.m2 \
+    ./mvnw dependency:go-offline -DskipTests
 
 # Create a stage for building the application based on the stage with downloaded dependencies.
 # This Dockerfile is optimized for Java applications that output an uber jar, which includes
